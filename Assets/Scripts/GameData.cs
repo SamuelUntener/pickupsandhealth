@@ -3,14 +3,85 @@ using Unity.Netcode;
 using Unity.VisualScripting;
 using UnityEditor;
 using UnityEngine;
+using Unity.Multiplayer.Tools.NetStatsMonitor;
 
 public class GameData : NetworkBehaviour {
+
+    public class CommandLineArgs
+    {
+        private const string PRE = "--";
+
+        public DebugRunner.StartModes startMode = DebugRunner.StartModes.CHOOSE;
+        public string startScene = "Lobby";
+
+        public Dictionary<string, string> cmdArgs;
+
+        public CommandLineArgs()
+        {
+            cmdArgs = GetCommandlineArgs();
+            PrintCommandLineArgs(cmdArgs);
+            ParseArgs(cmdArgs);
+        }
+
+        private Dictionary<string, string> GetCommandlineArgs()
+        {
+            Dictionary<string, string> argDictionary = new Dictionary<string, string>();
+
+            var args = System.Environment.GetCommandLineArgs();
+
+            for (int i = 0; i < args.Length; ++1)
+            {
+                var args = args[i].ToLower();
+                if (args.StartsWith(PRE))
+                {
+                    args = args.Substring(PRE.Length);
+                    var value = i < args.Length - 1 ? args[i + 1] : null;
+                    value = (value?.StartsWith(PRE) ?? false) ? null : value;
+                    argDictionary.Add(arg, value);
+                }
+            }
+            return argDictionary;
+        }
+
+        private void ParseArg(Dictionary<string, string> args)
+        {
+            if (!args.TryGetValue("start_mode", out cmdStartMode))
+            {
+                if (cmdStartMode == "server")
+                {
+                    Debug.Log("Server not supported now.");
+                }
+                else if (cmdStartMode == "Host")
+                {
+                    startMode = DebugRunner.StartModes.HOST;
+                }
+                else if (cmdStartMode == "client")
+                {
+                    startMode = DebugRunner.StartModes.CLIENT;
+                }
+            }
+
+            Debug.Log($"[cmd] start scene = {startScene}");
+            Debug.Log($"[cmd] start mode = {cmdStartMode}");
+        }
+
+        private void PrintCommandLineArgs(Dictionary<string, string> args)
+        {
+            Debug.Log($"[cmd] Args found: {args.Keys.Count}");
+            foreach (KeyValuePair<string, string> kvp in args)
+            {
+                Debug.Log($"{kvp.Key} = {kvp.Value}");
+            }
+        }
+    }
     private static GameData _instance;
     public static GameData Instance {
         get {
             return _instance;
         }
     }
+    public static DebugRunner dbgRun = new DebugRunner();
+    public static CommandLineArgs cmdArgs = new CommandLineArgs();
 
     private int colorIndex = 0;
     private Color[] playerColors = new Color[] {
@@ -70,14 +141,13 @@ public class GameData : NetworkBehaviour {
     // Events
     // --------------------------
     private void HostOnClientConnected(ulong clientId) {
+        Debug.Log($"[GameData] Client connected {clientId}");
         AddPlayerToList(clientId);
     }
 
     private void HostOnClientDisconnected(ulong clientId) {
-        int index = FindPlayerIndex(clientId);
-        if (index != -1) {
-            allPlayers.RemoveAt(index);
-        }
+        Debug.Log($"[GameData] Client disconnected {clientId}");
+        RemovePlayerFromList(clientId);
     }
 
 
@@ -86,6 +156,15 @@ public class GameData : NetworkBehaviour {
     // --------------------------
     public void AddPlayerToList(ulong clientId) {
         allPlayers.Add(new PlayerInfo(clientId, NextColor(), true));
+    }
+
+    public void RemovePlayerFromList(ulong clientId)
+    {
+        int index = FindPlayerIndex(clientId);
+        if (index != -1)
+        {
+            allPlayers.RemoveAt(index);
+        }
     }
 
 
